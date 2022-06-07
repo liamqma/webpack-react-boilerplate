@@ -1,5 +1,8 @@
-const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
+const { CompiledExtractPlugin } = require('@compiled/webpack-loader');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const commonPaths = require('./paths');
+
+
 
 module.exports = {
   mode: 'development',
@@ -12,39 +15,37 @@ module.exports = {
     rules: [
       {
         test: /\.(js|jsx)$/,
-        loader: 'babel-loader',
         exclude: /(node_modules)/,
-        options: {
-          presets: ['@babel/react'],
-          plugins: [
-            ['import', { libraryName: 'antd', style: true }],
-            require.resolve('react-refresh/babel'),
-          ].filter(Boolean),
-        },
+        use: [
+          {
+            loader: 'babel-loader',
+            options: {
+              presets: ['@babel/react'],
+              plugins: [
+                ['import', { libraryName: 'antd', style: true }],
+              ].filter(Boolean),
+            },
+          },
+          {
+            // ↓↓ defined last ↓↓
+            loader: '@compiled/webpack-loader',
+            options: {
+              extract: true,
+            },
+          },
+        ],
       },
       {
         test: /\.(css|scss)$/,
-        use: [
-          'style-loader',
-          {
-            loader: 'css-loader',
-            options: {
-              sourceMap: true,
-              localsConvention: 'camelCase',
-              modules: {
-                localIdentName: '[local]___[hash:base64:5]',
-              },
-            },
-          },
-          'sass-loader',
-        ],
+        use: [MiniCssExtractPlugin.loader, 'css-loader'],
       },
     ],
   },
   devServer: {
     contentBase: commonPaths.outputPath,
-    compress: true,
-    hot: true,
   },
-  plugins: [new ReactRefreshWebpackPlugin()],
+  plugins: [
+    new MiniCssExtractPlugin({ filename: '[contenthash].[name].css' }),
+    new CompiledExtractPlugin(),
+  ],
 };

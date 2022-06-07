@@ -1,6 +1,12 @@
 import React, { Component } from 'react';
+import { styled } from '@compiled/react';
 
-import HelloWorld from './components/hello-world';
+const Button = styled.button`
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 3px;
+  border: 1px solid blue;
+`;
 
 class App extends Component {
   constructor(props) {
@@ -9,7 +15,11 @@ class App extends Component {
   }
 
   render() {
-    return <HelloWorld title="Hello from React webpack" />;
+    return (
+      <div>
+        <Button>Test</Button>
+      </div>
+    );
   }
 }
 
