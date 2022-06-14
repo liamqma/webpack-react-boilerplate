@@ -4,7 +4,7 @@
   "description": "Boilerplate for react  and webpack",
   "main": "index.js",
   "scripts": {
-    "start": "cross-env NODE_ENV=development webpack serve --open",
+    "start": "cross-env NODE_ENV=development webpack serve",
     "build": "cross-env NODE_ENV=production webpack",
     "format": "prettier --write '**/*.js' --ignore-path .gitignore",
     "lint": "eslint -c .eslintrc  --fix $(git diff --name-only remotes/origin/master... --diff-filter=d | grep -E \"(.js$|.ts$|.tsx$|.jsx)\")",
@@ -114,6 +114,7 @@
     "eslint-watch": "7.0.0",
     "eslint-webpack-plugin": "2.6.0",
     "file-loader": "6.2.0",
+    "fix-style-emits-webpack-plugin": "^1.0.3",
     "html-webpack-plugin": "4.5.2",
     "husky": "6.0.0",
     "identity-obj-proxy": "3.0.0",

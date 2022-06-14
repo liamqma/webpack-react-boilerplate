@@ -2,8 +2,6 @@ const { CompiledExtractPlugin } = require('@compiled/webpack-loader');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const commonPaths = require('./paths');
 
-
-
 module.exports = {
   mode: 'development',
   output: {
@@ -19,12 +17,6 @@ module.exports = {
         use: [
           {
             loader: 'babel-loader',
-            options: {
-              presets: ['@babel/react'],
-              plugins: [
-                ['import', { libraryName: 'antd', style: true }],
-              ].filter(Boolean),
-            },
           },
           {
             // ↓↓ defined last ↓↓

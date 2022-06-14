@@ -1,4 +1,5 @@
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const { CompiledExtractPlugin } = require('@compiled/webpack-loader');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
@@ -51,29 +52,23 @@ module.exports = {
     rules: [
       {
         test: /\.(js|jsx)$/,
-        loader: 'babel-loader',
         exclude: /(node_modules)/,
-        options: {
-          presets: ['@babel/react'],
-          plugins: [['import', { libraryName: 'antd', style: true }]],
-        },
+        use: [
+          {
+            loader: 'babel-loader',
+          },
+          {
+            // ↓↓ defined last ↓↓
+            loader: '@compiled/webpack-loader',
+            options: {
+              extract: true,
+            },
+          },
+        ],
       },
       {
         test: /\.(css|scss)$/,
-        use: [
-          MiniCssExtractPlugin.loader,
-          {
-            loader: 'css-loader',
-            options: {
-              sourceMap: false,
-              localsConvention: 'camelCase',
-              modules: {
-                localIdentName: '[local]___[hash:base64:5]',
-              },
-            },
-          },
-          'sass-loader',
-        ],
+        use: [MiniCssExtractPlugin.loader, 'css-loader'],
       },
     ],
   },
@@ -83,6 +78,7 @@ module.exports = {
       filename: `${commonPaths.cssFolder}/[name].css`,
       chunkFilename: `${commonPaths.cssFolder}/[name].css`,
     }),
+    new CompiledExtractPlugin(),
   ],
   devtool: 'source-map',
 };
