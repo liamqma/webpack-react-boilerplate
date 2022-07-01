@@ -4,6 +4,7 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const OptimizeCSSAssetsPlugin = require('optimize-css-assets-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 
+const RemoveCompiledCssScript = require('./remove-compiled-css-script');
 const commonPaths = require('./paths');
 
 module.exports = {
@@ -73,6 +74,7 @@ module.exports = {
     ],
   },
   plugins: [
+    new RemoveCompiledCssScript(),
     new CleanWebpackPlugin(),
     new MiniCssExtractPlugin({
       filename: `${commonPaths.cssFolder}/[name].css`,

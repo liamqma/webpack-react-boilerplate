@@ -1,6 +1,7 @@
 const { CompiledExtractPlugin } = require('@compiled/webpack-loader');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const commonPaths = require('./paths');
+const RemoveCompiledCssScript = require('./remove-compiled-css-script');
 
 module.exports = {
   mode: 'development',
@@ -37,6 +38,7 @@ module.exports = {
     contentBase: commonPaths.outputPath,
   },
   plugins: [
+    new RemoveCompiledCssScript(),
     new MiniCssExtractPlugin({ filename: '[contenthash].[name].css' }),
     new CompiledExtractPlugin(),
   ],
