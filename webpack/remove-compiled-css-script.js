@@ -1,134 +1,83 @@
-/* eslint-disable no-restricted-syntax */
-const { RawSource, SourceMapSource, ConcatSource } = require('webpack-sources');
+/* eslint-disable no-param-reassign, no-underscore-dangle */
+/*
+    Using webpack 4 with mini-css-extract-plugin, it will generate an empty JS file.
+    This empty JS file costs us additional network connection.
+    This problem has been fixed[https://github.com/webpack/webpack/commit/c5f94f3b6a79a88da9ed93b5f980830f496f4fad] in webpack 5.
+    But webpack's maintainer don't want to fix it in webpack 4.
+    This Webpack Plugin is created to remove the JS file.
+*/
 
-const PLUGIN_NAME = 'RemoveCompiledCssScriptPlugin';
+const pluginName = 'RemoveCompiledCssScriptPlugin';
+const path = require('path');
 
-const importPattern = /__webpack_require__\([^;,]+\);/g;
-
-const compiledPath =
-  '@compiled/webpack-loader/css-loader!@compiled/webpack-loader/css-loader/compiled-css.css?style=';
-
-function processSource(originalSource, compiledModuleIds) {
-  if (compiledModuleIds.size === 0) return null;
-
-  let newSource = originalSource;
-
-  const matches = originalSource.matchAll(importPattern);
-  for (const match of matches) {
-    const requireExpression = match[0];
-    if (requireExpression.includes(compiledPath)) {
-      newSource = newSource.replace(requireExpression, '');
-    }
-  }
-
-  compiledModuleIds.forEach(moduleId => {
-    newSource = newSource.replace(`__webpack_require__(${moduleId})`, '');
-  });
-
-  // nothing has changed
-  if (newSource === originalSource) {
-    return null;
-  }
-  return newSource;
-}
+const CSS_MODULE_TYPE = 'css/mini-extract';
 
 module.exports = class RemoveCompiledCssScriptPlugin {
-  constructor(options) {
-    this.options = { ...options };
-    this.toIgnore = [];
-    this.compiledModuleIds = new Set();
-  }
-
-  collectCompiledModuleIds(modules) {
-    for (const module of modules) {
-      if (
-        typeof module.rawRequest === 'string' &&
-        module.rawRequest.startsWith(compiledPath)
-      ) {
-        this.compiledModuleIds.add(module.id);
-      }
-    }
+  constructor() {
+    this.problemChunkInfos = [];
   }
 
   apply(compiler) {
-    compiler.hooks.compilation.tap(PLUGIN_NAME, compilation => {
-      compilation.hooks.afterOptimizeModuleIds.tap(
-        PLUGIN_NAME,
-        this.collectCompiledModuleIds.bind(this)
-      );
+    compiler.hooks.thisCompilation.tap(pluginName, compilation => {
+      compilation.hooks.beforeChunkAssets.tap(pluginName, () => {
+        // find `compiledCss` chunks. The chunkReason must match cacheGroup.compiledCss from
+        // https://github.com/atlassian-labs/compiled/blob/master/packages/webpack-loader/src/extract-plugin.ts#L40
+        const splitChunks = compilation.chunks.filter(
+          thisChunk =>
+            thisChunk.chunkReason &&
+            /split chunk.*(compiledCSS)/.test(thisChunk.chunkReason)
+        );
 
-      compilation.moduleTemplates.javascript.hooks.package.tap(
-        PLUGIN_NAME,
-        (moduleSource, module) => {
-          const original = {
-            source: moduleSource.source(),
-            map:
-              typeof moduleSource.map === 'function'
-                ? moduleSource.map()
-                : null,
-          };
-          const newSource = processSource(
-            original.source,
-            this.compiledModuleIds
-          );
+        splitChunks.forEach(splitChunk => {
+          // store the empty modules
+          const uselessModules = [];
 
-          if (newSource === null) {
-            return moduleSource;
-          }
-
-          return original.map
-            ? new SourceMapSource(
-                newSource,
-                module.id,
-                original.map,
-                original.source,
-                original.map
+          Array.from(splitChunk.modulesIterable).forEach(mod => {
+            if (
+              mod.type !== CSS_MODULE_TYPE &&
+              mod._source &&
+              // https://github.com/webpack-contrib/mini-css-extract-plugin/blob/b426f04961846991e8ca671c6a4d48e6a83a46c2/src/loader.js#L244
+              // looking at the source code of mini-css-extract-plugin, assume that the empty module starts with
+              // "// extracted by mini-css-extract-plugin"
+              mod._source._value.startsWith(
+                '// extracted by mini-css-extract-plugin'
               )
-            : new RawSource(newSource);
-        }
-      );
-      compilation.hooks.optimizeChunkAssets.tap(PLUGIN_NAME, chunks => {
-        // append (window["webpackJsonp"] = window["webpackJsonp"] || []).push([[0],{}]); to main
-        // find the asset to delete
-        let toUpdateAssetName;
+            ) {
+              uselessModules.push(mod);
+            }
+          });
 
-        for (const chunk of chunks) {
-          if (chunk.name === 'main' && chunk.files.length) {
-            [toUpdateAssetName] = chunk.files;
-          }
-        }
+          // move the uselessModules to the originated chunk
+          uselessModules.forEach(uselessModule => {
+            uselessModule.reasons.forEach(reason => {
+              reason.module.chunksIterable.forEach(previouslyConnectedChunk => {
+                splitChunk.moveModule(uselessModule, previouslyConnectedChunk);
+              });
+            });
+          });
 
-        // Bail early if jira-spa.js cannot be found
-        if (!toUpdateAssetName) {
-          return;
-        }
+          // store the chunk id so we can delete the .js file later
+          this.problemChunkInfos.push(splitChunk.id);
 
-        debugger;
+          // remove the chunk from chunk group
+          splitChunk.groupsIterable.forEach(group => {
+            group.removeChunk(splitChunk);
+          });
+        });
+      });
 
-        for (const chunk of chunks) {
-          if (
-            chunk.chunkReason &&
-            /split chunk.*(compiledCSS)/.test(chunk.chunkReason)
-          ) {
-            const jsFile = chunk.files.find(f => /\.js$/.test(f));
-            chunk.files = chunk.files.filter(f => !/\.js/.test(f));
-            compilation.updateAsset(toUpdateAssetName, oldSource => {
-              this.toIgnore.push(jsFile);
-              // source map?
-              return new ConcatSource(
-                oldSource,
-                `\n\n(window["webpackJsonp"] = window["webpackJsonp"] || []).push([['compiled-css'],{}]);\n\n`
-              );
+      compilation.hooks.additionalChunkAssets.tap(pluginName, chunks => {
+        chunks.forEach(chunk => {
+          if (this.problemChunkInfos.includes(chunk.id)) {
+            chunk.files.forEach(file => {
+              if (path.extname(file) === '.js') {
+                // delete compiled-css.js
+                chunk.files.pop();
+                delete compilation.assets[file];
+              }
             });
           }
-        }
-      });
-    });
-    compiler.hooks.emit.tap(PLUGIN_NAME, compilation => {
-      // delete the asset
-      this.toIgnore.forEach(file => {
-        delete compilation.assets[file];
-        delete compilation.assets[`${file}.map`];
+        });
       });
     });
   }

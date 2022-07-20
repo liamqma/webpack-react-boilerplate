@@ -77,8 +77,7 @@ module.exports = {
     new RemoveCompiledCssScript(),
     new CleanWebpackPlugin(),
     new MiniCssExtractPlugin({
-      filename: `${commonPaths.cssFolder}/[name].css`,
-      chunkFilename: `${commonPaths.cssFolder}/[name].css`,
+      filename: `${commonPaths.cssFolder}/[name].[hash].css`,
     }),
     new CompiledExtractPlugin(),
   ],

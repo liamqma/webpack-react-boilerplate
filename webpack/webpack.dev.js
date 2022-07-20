@@ -39,7 +39,7 @@ module.exports = {
   },
   plugins: [
     new RemoveCompiledCssScript(),
-    new MiniCssExtractPlugin({ filename: '[contenthash].[name].css' }),
+    new MiniCssExtractPlugin({ filename: '[name].css' }),
     new CompiledExtractPlugin(),
   ],
 };
